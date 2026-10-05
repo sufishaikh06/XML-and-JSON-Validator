@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XML and JSON Validator (Pushdown Automaton)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{--ink:#14213D;--mute:#5B6B7A;--bg:#F3F6FA;--card:#fff;--line:#CBD5E1;--teal:#0E7C86;--lteal:#DDF1F2;--ok:#1F8A4C;--lok:#E3F4EA;--bad:#C0392B;--lbad:#FBE9E7;--code:#0F1B2D;
+--sans:"Source Sans 3",Calibri,"Segoe UI",sans-serif;--serif:"Source Serif 4",Cambria,Georgia,serif;--mono:"JetBrains Mono","Courier New",monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--sans)}
+header{background:var(--ink);color:#fff;padding:28px 5vw 24px}
+h1{font:700 clamp(26px,4vw,38px)/1.15 var(--serif);margin:0 0 6px}
+header p{margin:0;max-width:70ch;color:#BFD3E6}
+main{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:20px;padding:20px 5vw 40px;max-width:1500px;margin:auto}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+h2{font:700 18px var(--serif);margin:0 0 10px}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tab{font:600 15px var(--sans);padding:8px 18px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;color:var(--ink)}
+.tab[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+textarea{width:100%;height:320px;resize:vertical;font:14px/1.5 var(--mono);background:var(--code);color:#E6EDF5;border:0;border-radius:8px;padding:12px;tab-size:4}
+textarea.drag{outline:3px dashed var(--teal);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+button{font:600 14px var(--sans);padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button:hover:not(:disabled){border-color:var(--teal)}button:disabled{opacity:.4;cursor:default}
+button.go{background:var(--teal);border-color:var(--teal);color:#fff;font-size:16px;padding:10px 22px}
+:focus-visible{outline:3px solid #5DA9E9;outline-offset:2px}
+.hint{font-size:13px;color:var(--mute);margin:10px 0 0}
+#banner{border-radius:10px;padding:14px 16px;font-weight:600;border:1px solid var(--line);background:#fff}
+#banner.ok{background:var(--lok);border-color:var(--ok);color:#14532d}
+#banner.bad{background:var(--lbad);border-color:var(--bad);color:#7f1d1d}
+#banner b{font:700 20px var(--serif);display:block}
+#banner span{font-weight:400}
+.split{display:grid;grid-template-columns:minmax(150px,1fr) minmax(0,2fr);gap:16px;margin-top:16px}
+@media(max-width:560px){.split{grid-template-columns:1fr}}
+.stack{display:flex;flex-direction:column;gap:6px;min-height:230px;border-bottom:4px solid var(--ink);padding-bottom:6px;justify-content:flex-start}
+.cell{font:600 15px var(--mono);padding:9px 10px;border-radius:6px;background:#6FB3BF;color:#fff;overflow-wrap:anywhere;position:relative}
+.cell.top{background:var(--teal)}
+.cell.top::after{content:"top";position:absolute;right:8px;top:50%;transform:translateY(-50%);font:600 12px var(--sans);opacity:.85}
+.cell.in{animation:drop .3s ease-out}
+@keyframes drop{from{transform:translateY(-14px);opacity:0}}
+.empty{border:2px dashed var(--line);border-radius:6px;padding:12px;color:var(--mute);text-align:center;font-size:14px}
+.status{font:600 14px var(--mono);background:var(--lteal);border-radius:6px;padding:8px 10px;margin-top:10px;min-height:38px;overflow-wrap:anywhere}
+.tw{max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{position:sticky;top:0;background:var(--ink);color:#fff;text-align:left;padding:7px 8px}
+td{padding:6px 8px;border-top:1px solid var(--line);font-family:var(--mono);vertical-align:top;overflow-wrap:anywhere}
+tr.r{cursor:pointer}tr.fut{opacity:.35}tr.act{background:var(--lteal);outline:2px solid var(--teal);outline-offset:-2px}
+.push{color:var(--ok);font-weight:600}.pop{color:#8a5a00;font-weight:600}.reject{color:var(--bad);font-weight:700}.accept{color:var(--ok);font-weight:700}.ignore{color:var(--mute)}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.ctl .n{margin-left:auto;font-size:14px;color:var(--mute)}
+@media(prefers-reduced-motion:reduce){.cell.in{animation:none}}
+</style>
+</head>
+<body>
+<header>
+<h1>XML and JSON Validator</h1>
+<p>A pushdown automaton checks nesting with a stack. Each opening tag or bracket is pushed; each closing one must match the top, then it is popped. An empty stack at the end means the input is accepted.</p>
+</header>
+<main>
+<section class="card" aria-label="Input">
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="t-xml" aria-selected="true">XML</button>
+    <button class="tab" role="tab" id="t-json" aria-selected="false">JSON</button>
+  </div>
+  <textarea id="in" spellcheck="false" aria-label="Document to validate"></textarea>
+  <div class="row">
+    <button class="go" id="up">Upload XML or JSON file</button>
+    <input type="file" id="file" accept=".xml,.json,application/xml,text/xml,application/json" hidden>
+    <button id="go">Validate text</button>
+    <button data-s="valid">Valid example</button>
+    <button data-s="mismatch">Mismatch example</button>
+    <button data-s="unclosed">Unclosed example</button>
+    <button id="clr">Clear</button>
+  </div>
+  <p class="hint">Upload a .xml or .json file (or drag it onto the box). It is validated at once and the type is detected automatically. Shortcut for typed text: Ctrl + Enter. Checks nesting only: XML tag order, and JSON { } and [ ] order. Commas, colons and values are not checked. Characters inside JSON strings are skipped.</p>
+</section>
+
+<section aria-label="Result">
+  <div id="banner" aria-live="polite"><b>Ready</b><span>Paste a document and press Validate.</span></div>
+  <div class="card" style="margin-top:16px">
+    <div class="ctl" style="margin:0 0 4px">
+      <button id="reset">Start</button><button id="prev">Back</button><button id="next">Next step</button><button id="play">Play</button><button id="fin">Show result</button>
+      <span class="n" id="cnt"></span>
+    </div>
+    <div class="split">
+      <div><h2>Stack</h2><div class="stack" id="stack"></div><div class="status" id="status"></div></div>
+      <div><h2>Operations</h2><div class="tw"><table><thead><tr><th>#</th><th>Read</th><th>Line</th><th>Stack after</th><th>Action</th></tr></thead><tbody id="tb"></tbody></table></div></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SAMPLES={
+xml:{valid:'<?xml version="1.0"?>\n<college>\n    <student>\n        <name>Sufi</name>\n        <!-- skills -->\n        <skill level="high"/>\n    </student>\n</college>',
+ mismatch:'<college>\n    <student>\n        <name>Sufi</student>\n    </name>\n</college>',
+ unclosed:'<college>\n    <student>\n        <name>Sufi</name>\n</college>'},
+json:{valid:'{\n    "student": {\n        "name": "Sufi",\n        "skills": ["Python", "C++"]\n    }\n}',
+ mismatch:'{"a": [1, 2}}',
+ unclosed:'{\n    "student": {\n        "skills": ["Python", "C++"\n    }\n}'}};
+let mode='xml',steps=[],res=null,cur=-1,timer=null,fname='';
+
+function run(mode,t){
+  const st=[],steps=[];
+  const add=(tok,line,act,type)=>steps.push({tok,line,stack:[...st],act,type});
+  const done=(valid,msg)=>({steps,valid,msg});
+  const rej=(tok,line,act,msg)=>{add(tok,line,'REJECT: '+act,'reject');return done(false,msg)};
+  const lineAt=i=>t.slice(0,i).split('\n').length;
+  if(!t.trim())return done(false,'Nothing to validate. Enter a document first.');
+  let lastLine=t.split('\n').length;
+  if(mode==='xml'){
+    const re=/<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\/?[A-Za-z_][^>]*>/g;
+    let m,n=0;
+    while((m=re.exec(t))){
+      n++;const tok=m[0],line=lineAt(m.index),short=tok.length>26?tok.slice(0,23)+'...':tok;
+      if(/^<(!|\?)/.test(tok)){add(short,line,'IGNORE (comment or declaration)','ignore');continue}
+      const nm=tok.match(/^<\/?([A-Za-z_][\w:.-]*)/);
+      if(!nm)return rej(short,line,'invalid tag name',`Line ${line}: invalid tag ${short}.`);
+      const name=nm[1];
+      if(tok[1]==='/'){
+        if(!st.length)return rej(tok,line,'stack empty',`Line ${line}: closing </${name}> has no matching opening tag.`);
+        const top=st[st.length-1];
+        if(top!==name)return rej(tok,line,`expected </${top}>`,`Line ${line}: mismatched tag. Found </${name}> but the open tag is <${top}>.`);
+        st.pop();add(tok,line,'POP '+name,'pop');
+      }else if(/\/>$/.test(tok)){add(tok.replace(/\s+/g,' '),line,'SELF-CLOSING (no stack change)','ignore')}
+      else{st.push(name);add(tok.length>26?'<'+name+' ...>':tok,line,'PUSH '+name,'push')}
+    }
+    if(!n)return done(false,'No XML tags found.');
+    if(st.length){add('END OF INPUT',lastLine,'REJECT: stack not empty','reject');return done(false,'Unclosed tag(s), innermost first: '+[...st].reverse().map(x=>`<${x}>`).join(', ')+'.')}
+  }else{
+    let inS=false,esc_=false,line=1,col=0,sl=1,sc=0;const pair={'}':'{',']':'['};
+    for(const ch of t){
+      col++;
+      if(ch==='\n'){line++;col=0;if(inS)return rej('"','',' newline inside string',`Line ${sl}: string starting at column ${sc} is not closed.`)}
+      if(inS){if(esc_)esc_=false;else if(ch==='\\')esc_=true;else if(ch==='"')inS=false;continue}
+      if(ch==='"'){inS=true;sl=line;sc=col;continue}
+      if(ch==='{'||ch==='['){st.push(ch);add(ch,line,'PUSH '+ch,'push')}
+      else if(ch==='}'||ch===']'){
+        if(!st.length)return rej(ch,line,'stack empty',`Line ${line}, column ${col}: '${ch}' has no matching opening delimiter.`);
+        const top=st[st.length-1];
+        if(top!==pair[ch])return rej(ch,line,`expected '${top==='{'?'}':']'}'`,`Line ${line}, column ${col}: found '${ch}' but the open delimiter is '${top}'.`);
+        st.pop();add(ch,line,'POP '+top,'pop');
+      }
+    }
+    if(inS)return rej('END OF INPUT',line,'unterminated string',`Line ${sl}: string starting at column ${sc} is not closed.`);
+    if(!steps.length)return done(false,'No { } or [ ] found.');
+    if(st.length){add('END OF INPUT',line,'REJECT: stack not empty','reject');return done(false,'Unclosed delimiter(s), innermost first: '+[...st].reverse().join(' ')+'')}
+  }
+  add('END OF INPUT',lastLine,'ACCEPT: stack is empty','accept');
+  return done(true,'Every opening '+(mode==='xml'?'tag':'delimiter')+' was closed in the correct order.');
+}
+
+function render(){
+  const last=steps.length-1,s=cur>=0?steps[cur]:null,sk=$('stack');
+  const stk=s?s.stack:[];
+  sk.innerHTML=stk.length?[...stk].reverse().map((x,i)=>`<div class="cell${i===0?' top':''}${i===0&&s&&s.type==='push'?' in':''}">${esc(mode==='xml'?'<'+x+'>':x)}</div>`).join(''):'<div class="empty">empty stack</div>';
+  $('status').textContent=s?`Read ${s.tok}  →  ${s.act}`:'Press Next step to begin.';
+  $('tb').innerHTML=steps.map((x,i)=>`<tr class="r ${i===cur?'act':i>cur?'fut':''}" data-i="${i}"><td>${i+1}</td><td>${esc(x.tok)}</td><td>${x.line}</td><td>${x.stack.length?esc(x.stack.map(y=>mode==='xml'?y:y).join(', ')):'EMPTY'}</td><td class="${x.type}">${esc(x.act)}</td></tr>`).join('');
+  const a=document.querySelector('tr.act');if(a)a.scrollIntoView({block:'nearest'});
+  $('cnt').textContent=steps.length?`Step ${Math.max(cur+1,0)} of ${steps.length}`:'';
+  $('prev').disabled=cur<0;$('reset').disabled=cur<0;$('next').disabled=!steps.length||cur>=last;$('fin').disabled=!steps.length||cur>=last;$('play').disabled=!steps.length||cur>=last;
+  const b=$('banner');
+  if(res&&cur===last){b.className=res.valid?'ok':'bad';b.innerHTML=`<b>${res.valid?'ACCEPTED':'REJECTED'}${fname?' — '+esc(fname):''}</b><span>${esc(res.msg)}</span>`}
+  else if(res){b.className='';b.innerHTML=`<b>Stepping through</b><span>Press Show result to jump to the verdict.</span>`}
+}
+function validate(){
+  stop();res=run(mode,$('in').value);steps=res.steps;cur=steps.length-1;render();
+}
+function stop(){clearInterval(timer);timer=null;$('play').textContent='Play'}
+$('go').onclick=validate;
+$('in').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')validate()});
+$('next').onclick=()=>{if(cur<steps.length-1){cur++;render()}};
+$('prev').onclick=()=>{stop();if(cur>=0){cur--;render()}};
+$('reset').onclick=()=>{stop();cur=-1;render()};
+$('fin').onclick=()=>{stop();cur=steps.length-1;render()};
+$('play').onclick=()=>{
+  if(timer){stop();return}
+  if(cur>=steps.length-1)cur=-1;
+  $('play').textContent='Pause';
+  timer=setInterval(()=>{if(cur>=steps.length-1){stop();render();return}cur++;render()},700);render();
+};
+$('tb').onclick=e=>{const r=e.target.closest('tr');if(r){stop();cur=+r.dataset.i;render()}};
+$('clr').onclick=()=>{stop();$('in').value='';steps=[];res=null;cur=-1;$('banner').className='';$('banner').innerHTML='<b>Ready</b><span>Paste a document and press Validate.</span>';render()};
+document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{fname='';$('in').value=SAMPLES[mode][b.dataset.s];validate()});
+function setMode(m,keep){
+  mode=m;stop();['xml','json'].forEach(k=>$('t-'+k).setAttribute('aria-selected',k===m));
+  if(!keep){fname='';$('in').value=SAMPLES[m].valid;validate()}
+}
+$('t-xml').onclick=()=>setMode('xml');$('t-json').onclick=()=>setMode('json');
+
+function showErr(title,msg){
+  stop();steps=[];res=null;cur=-1;render();
+  const b=$('banner');b.className='bad';b.innerHTML=`<b>${esc(title)}</b><span>${esc(msg)}</span>`;
+}
+function loadFile(f){
+  if(!f)return;
+  if(f.size>2*1024*1024)return showErr('File too large','Choose a file under 2 MB.');
+  const r=new FileReader();
+  r.onerror=()=>showErr('Could not read file','The browser could not open '+f.name+'.');
+  r.onload=()=>{
+    const text=String(r.result).replace(/^\uFEFF/,'');
+    const ext=(f.name.split('.').pop()||'').toLowerCase();
+    let m=ext==='xml'?'xml':ext==='json'?'json':null;
+    if(!m){const c=text.trim()[0];m=c==='<'?'xml':(c==='{'||c==='[')?'json':null}
+    if(!m)return showErr('Unsupported file','Upload a .xml or .json file.');
+    $('in').value=text;fname=f.name;setMode(m,true);validate();
+  };
+  r.readAsText(f);
+}
+$('up').onclick=()=>$('file').click();
+$('file').onchange=e=>{loadFile(e.target.files[0]);e.target.value=''};
+const ta=$('in');
+['dragenter','dragover'].forEach(ev=>ta.addEventListener(ev,e=>{e.preventDefault();ta.classList.add('drag')}));
+['dragleave','drop'].forEach(ev=>ta.addEventListener(ev,e=>{e.preventDefault();ta.classList.remove('drag')}));
+ta.addEventListener('drop',e=>loadFile(e.dataTransfer.files[0]));
+ta.addEventListener('input',()=>{fname=''});
+setMode('xml');
+</script>
+</body>
+</html>
